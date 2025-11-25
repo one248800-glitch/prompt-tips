@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>생성형AI 프롬프트 이해</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #f8fafc; /* Tailwind slate-50 */
+        }
+        
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; /* slate-100 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #64748b; /* slate-500 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569; /* slate-600 */
+        }
+
+        /* Style for active navigation link */
+        .nav-link.active {
+            background-color: #0f172a; /* slate-900 */
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        /* Component card for selection */
+        .component-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: 1px solid #e2e8f0; /* slate-200 */
+        }
+        .component-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+            border-color: #94a3b8; /* slate-400 */
+        }
+        .component-card.selected {
+            border: 2px solid #22c55e; /* emerald-500 */
+            background-color: #f0fdf4; /* emerald-50 */
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2); /* emerald-500 shadow */
+        }
+        
+        .code-block {
+            white-space: pre-wrap; /* 줄바꿈 유지 */
+            word-wrap: break-word;
+            text-align: left;
+        }
+        
+        /* 폰트 크기를 약 2배로 키웠습니다. (기존 0.9rem -> 1.8rem) */
+        .section-header-badge {
+            font-size: 1.8rem; /* 크기 조정 */
+            padding: 0.5rem 1.0rem; /* 패딩 조정 */
+            border-radius: 0.75rem; /* 모서리 둥글기 조정 */
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            display: inline-block;
+            color: white;
+        }
+
+    </style>
+    <script>
+        // 핵심 컴포넌트 데이터 (6가지 요소만 포함)
+        const components = {
+            role: [ // 1. Persona
+                { id: 'r1', label: '10년차 초등 교사', example: '당신은 10년차 초등학교 5학년 사회 교사입니다.' },
+                { id: 'r2', label: '업무담당자', example: '당신은 초등학교 정보보안 업무 담당자입니다.' },
+                { id: 'r3', label: '코딩 교육 강사', example: '당신은 초등학생 대상 코딩 교육 강사입니다.' },
+            ],
+            task: [ // 2. Task
+                { id: 't1', label: '교직원 회의 자료 대본 작성', keyword: '대본', example: '10분 분량의 교직원 회의 발표 자료 대본을 적어 주세요.' },
+                { id: 't2', label: '창의적 문제 해결 활동 설계', keyword: '활동 설계', example: '환경 문제 해결을 위한 프로젝트 수업 아이디어를 3가지 제시해 주세요.' },
+                { id: 't3', label: '퀴즈 생성', keyword: '퀴즈', example: '4학년 학생에게 물어볼 객관식 퀴즈 4지선다형 10문제 만들어주세요.' },
+                { id: 't4', label: '학부모 대상 안내문 작성', keyword: '안내문', example: '2학기 현장체험학습에 대한 학부모 안내문을 작성해 주세요. (날짜, 장소, 준비물 포함)' },
+                { id: 't5', label: '수업 활동 평가 루브릭 제작', keyword: '루브릭', example: '학생들의 협동 활동 평가를 위한 4단계 루브릭을 만들어 주세요. 평가 항목은 3개입니다.' },
+                { id: 't6', label: '학생 행동 코칭 대화문', keyword: '대화문', example: '친구와 다투는 학생을 지도할 때 사용할 수 있는 단계별 대화 코칭 스크립트를 작성해 주세요.' },
+                { id: 't7', label: '파이썬 코드 설명', keyword: '코드 설명', example: '파이썬으로 구현된 다음 코드를 초등학생이 이해하기 쉽게 설명해 주세요.' },
+            ],
+            context: [ // 3. Context
+                { id: 'c1', label: '다문화 학생 포함된 반', keyword: '다문화 학생', example: '우리 반은 다문화 학생 비율이 30%입니다. 배경 지식 설명이 특히 필요합니다.' },
+                { id: 'c2', label: '업로드 자료 학습', keyword: '업로드 자료 학습', example: '다음 첨부된 PDF 자료를 학습하고, 해당 자료를 기반으로 답변해 주세요.' },
+                { id: 'c3', 'label': 'SW 교육 의무화 관련', keyword: 'SW 교육', example: '2025년부터 SW 교육이 의무화됩니다. 이 점을 고려하여 답변해 주세요.' },
+            ],
+            exemplar: [ // 4. Exemplar
+                { id: 'e1', label: '전체 스타일 지정 (서식/문체 예시)', example: '다음 예시처럼 핵심 키워드를 **굵게 강조**하고, 문장은 "~입니다."로 끝내주세요: [예시: "환경 오염은 **미래의 우리**에게 큰 숙제를 남깁니다."]' },
+                { id: 'e2', label: '특정 항목의 형식 지정 (구조/규격 예시)', example: '수업 목표는 [예시: **동사**할 수 있다.] 형태로만 작성해 주세요: [예시: 학생들은 환경 보호 실천의 중요성을 인지할 수 있다.]' },
+                { id: 'e3', label: '대화 형식 예시', example: '다음과 같은 대화 형식으로 답변해주세요: [교사: 안녕 얘들아! / 학생: 안녕하세요!]' },
+            ],
+            format: [ // 5. Format
+                { id: 'f1', label: '표/리스트 형식으로 정리', example: '결과물은 표 형식으로 정리해 주세요.' },
+                { id: 'f2', label: '글자 수 및 문단 구조 제한', example: '각각 100자 이내의 문단 3개로 구성해 주세요.' },
+                { id: 'f3', label: 'PPT 슬라이드 구성안 제작', example: '결과를 5개의 슬라이드 구성안으로 나누고, 각 슬라이드에는 제목과 3개의 불릿 포인트만 포함해 주세요.' },
+                { id: 'f4', label: 'Excel/CSV 데이터 출력', example: '결과를 엑셀에 바로 붙여넣을 수 있도록, 정확히 3개의 열(Column)과 10개의 행(Row)을 가진 마크다운 표로 만들어 주세요.' },
+            ],
+            tone: [ // 6. Tone
+                { id: 'n1', label: '긍정적이고 유머러스하게', example: '초등학생들이 좋아할 만한 긍정적이고 쉽고, 유머러스한 어조로 설명해 주세요.' },
+                { id: 'n2', label: '전문적이고 학술적으로', example: '공식 자료에 사용할 수 있도록 전문적이고 신뢰성 있는 어조를 사용해 주세요.' },
+                { id: 'n3', label: '친근하고 대화체로', example: '친근하고 대화하는 듯한 어조로 작성해 주세요.' },
+            ],
+        };
+
+        // 6가지 요소를 포함하도록 초기화
+        let selectedComponents = {
+            role: null,
+            task: null,
+            context: null,
+            exemplar: null,
+            format: null,
+            tone: null,
+        };
+        
+        // 섹션 정의 (TOC 및 최종 프롬프트 구성 순서에 맞춤)
+        const sections = [
+            { type: 'overview', title: '🚀 소개', id: 'intro', description: '생성형 AI 프롬프트 마스터 가이드를 소개합니다.' },
+            { type: 'role', title: '1. 역할 (Persona) ⭐', id: 'section-role', description: '결과의 품질을 결정! ChatGPT에게 명확한 페르소나(전문가, 교사 등)를 부여하여 답변의 깊이를 결정합니다.' },
+            { type: 'task', title: '2. 작업 (Task) ⭐', id: 'section-task', description: '가장 필수적인 요소! ChatGPT가 무엇을 할지 명확히 지시합니다. 이 요소가 모호하면 다른 요소가 잘 설정되어도 원하는 결과를 얻기 어렵습니다.' },
+            { type: 'context', title: '3. 맥락 (Context) ⭐', id: 'section-context', description: '맞춤형 결과! 배경 정보(학생 수준, 단원, 목표)를 제공하여 관련성 높은 맞춤형 답변을 유도합니다.' },
+            { type: 'exemplar', title: '4. 예시 (Exemplars)', id: 'section-exemplar', description: '정확도 향상! 원하는 결과물의 스타일이나 구조를 보여주는 구체적인 예시를 제공하여 정확도를 높입니다.' },
+            { type: 'format', title: '5. 형식 (Format)', id: 'section-format', description: '결과물의 구조, 길이, 구성 요소 등 물리적인 형태를 명시합니다.' },
+            { type: 'tone', title: '6. 어조 (Tone)', id: 'section-tone', description: '결과물의 감성이나 분위기를 설정합니다. (친근함, 전문성, 유머러스함 등)' },
+            { type: 'comparison', title: '🔥 프롬프트의 힘, 비교 체험', id: 'section-comparison', description: '좋은 프롬프트와 나쁜 프롬프트의 차이를 직접 경험해보세요.' },
+        ];
+
+        function updatePromptDisplay() {
+            let combinedPrompt = [];
+            // 6가지 요소에 맞는 색상 지정
+            const colors = {
+                role: 'text-emerald-600',
+                task: 'text-sky-600',
+                context: 'text-indigo-600',
+                exemplar: 'text-amber-600',
+                format: 'text-purple-600',
+                tone: 'text-rose-600',
+            };
+
+            // 선택된 구성 요소들을 모아서 프롬프트를 구성 (논리적인 순서로 정렬)
+            if (selectedComponents.role) combinedPrompt.push(`<span class="${colors.role} font-semibold">${selectedComponents.role.example}</span>`);
+            if (selectedComponents.context) combinedPrompt.push(`<span class="${colors.context} font-semibold">${selectedComponents.context.example}</span>`);
+            if (selectedComponents.task) combinedPrompt.push(`<span class="${colors.task} font-semibold">${selectedComponents.task.example}</span>`);
+            if (selectedComponents.exemplar) combinedPrompt.push(`<span class="${colors.exemplar} font-semibold">${selectedComponents.exemplar.example}</span>`);
+            if (selectedComponents.format) combinedPrompt.push(`<span class="${colors.format} font-semibold">${selectedComponents.format.example}</span>`);
+            if (selectedComponents.tone) combinedPrompt.push(`<span class="${colors.tone} font-semibold">${selectedComponents.tone.example}</span>`);
+            
+            const promptText = combinedPrompt.length > 0
+                ? combinedPrompt.join('\n\n')
+                : '프롬프트의 핵심 요소를 조합하여 시작해 보세요! (총 6가지)';
+
+            document.getElementById('result-prompt').innerHTML = promptText;
+            document.getElementById('prompt-length').textContent = combinedPrompt.filter(Boolean).length;
+            
+        }
+
+        function toggleComponent(type, componentId) {
+            const cardElement = document.getElementById(componentId);
+            const isSelected = cardElement.classList.contains('selected');
+            
+            // 현재 선택된 카드의 모든 'selected' 클래스 제거
+            document.querySelectorAll(`[data-type="${type}"]`).forEach(el => {
+                el.classList.remove('selected');
+            });
+
+            if (!isSelected) {
+                // 새로 선택
+                cardElement.classList.add('selected');
+                const component = components[type].find(c => c.id === componentId);
+                selectedComponents[type] = component;
+            } else {
+                // 선택 해제
+                selectedComponents[type] = null;
+            }
+            
+            updatePromptDisplay();
+        }
+        
+        // 항목의 라벨에서 키워드만 색상을 바꾸는 함수
+        function highlightKeyword(label, keyword) {
+            if (!keyword || !label.includes(keyword)) {
+                return label;
+            }
+            // 키워드를 찾아서 빨간색으로 감싸줍니다.
+            return label.replace(keyword, `<span class="text-red-600">${keyword}</span>`);
+        }
+
+        // 초기 렌더링
+        window.onload = () => {
+            const mainContentContainer = document.querySelector('#main-content .mx-auto');
+            
+            // Generate sections dynamically
+            sections.forEach(section => {
+                let sectionHtml = `<section id="${section.id}" class="section-content pt-16 mb-8 md:mb-16">
+                    <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-slate-200">`;
+
+                if (section.type === 'overview') {
+                    sectionHtml += `<h1 class="text-4xl md:text-5xl font-extrabold text-slate-800 mb-4 text-center">✨ 생성형AI 프롬프트 이해 ✨</h1>
+                                    <p class="text-xl md:text-2xl text-slate-600 font-medium text-center mb-8">
+                                        6가지 핵심 요소로 수업 준비 시간을 획기적으로 줄여보세요! 😄
+                                    </p>
+                                    <p class="text-lg space-y-4 text-slate-700 leading-relaxed mb-6">
+                                        생성형 인공지능(AI)은 교실과 업무 환경에 혁신을 가져올 잠재력을 가지고 있습니다. 하지만 AI의 잠재력을 최대한 활용하기 위해서는 '프롬프트'를 효과적으로 작성하는 것이 중요합니다. 이 가이드는 AI에게 명확하고 구체적인 지시를 내리는 6가지 핵심 요소를 소개합니다.
+                                    </p>
+                                    <div class="text-center">
+                                        <p class="inline-block bg-red-500 text-white font-bold py-2 px-4 rounded-full text-sm">
+                                            더 이상 막연한 질문은 그만!
+                                        </p>
+                                    </div>
+                                    `;
+                } else if (section.type === 'comparison') {
+                    sectionHtml += `<h2 class="text-3xl font-bold text-slate-800 mb-6">🔥 프롬프트의 힘, 비교 체험</h2>
+                        <p class="text-lg space-y-4 text-slate-700 leading-relaxed mb-6">
+                            잘 만든 프롬프트 하나가 AI의 성능을 좌우합니다. 아래 예시를 통해 그 차이를 직접 확인해 보세요.
+                        </p>
+                        <div class="mb-5 p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <p class="font-semibold text-red-700">❌ 나쁜 프롬프트 (모호함)</p>
+                            <div class="bg-red-100 py-2 px-3 rounded-md text-sm text-red-800 mt-1 code-block">
+                                수업 자료 만들어줘.
+                            </div>
+                            <p class="text-xs text-red-500 mt-1">
+                                결과: 일반적이고 쓸모없는, 맥락 없는 답변.
+                            </p>
+                        </div>
+                        
+                        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <p class="font-semibold text-emerald-700">✅ 좋은 프롬프트 (구체적)</p>
+                            <div class="bg-emerald-100 py-2 px-3 rounded-md text-sm text-emerald-800 mt-1 code-block">
+                                <span class="text-emerald-600 font-semibold">(역할)</span> 당신은 10년차 초등학교 5학년 사회 교사입니다.<br><br>
+                                <span class="text-indigo-600 font-semibold">(맥락)</span> 2학기 2단원 환경과 더불어 사는 삶을 배우는 반이고, 학생들이 환경 문제를 막연하게 느끼고 있습니다.<br><br>
+                                <span class="text-sky-600 font-semibold">(작업)</span> 이 단원의 보충 학습 자료 3개를 만들어 주세요. 실제 국내 사례를 중심으로 설명이 필요합니다.<br><br>
+                                <span class="text-amber-600 font-semibold">(예시)</span> 설명 시 '자원 재활용'과 같이 중요한 키워드는 **굵은 글씨**로 처리해 주세요.<br><br>
+                                <span class="text-purple-600 font-semibold">(형식)</span> 자료는 제목, 목표, 활동 방법 3단계로 나누어 설명하고, 각각 150자 이내로 구성해 주세요.<br><br>
+                                <span class="text-rose-600 font-semibold">(어조)</span> 친근하면서도 명확한 문체로 작성해 주세요.
+                            </div>
+                            <p class="text-xs text-emerald-600 mt-1">
+                                결과: 교실에서 바로 활용 가능한 실질적인 자료.
+                            </p>
+                        </div>
+                    </div>
+                </section>`;
+
+                } else {
+                    let bgColorClass = '';
+                    switch (section.type) {
+                        case 'role': bgColorClass = 'bg-emerald-600'; break;
+                        case 'task': bgColorClass = 'bg-sky-600'; break;
+                        case 'context': bgColorClass = 'bg-indigo-600'; break;
+                        case 'exemplar': bgColorClass = 'bg-amber-600'; break;
+                        case 'format': bgColorClass = 'bg-purple-600'; break;
+                        case 'tone': bgColorClass = 'bg-rose-600'; break;
+                    }
+
+                    // 폰트 크기가 커짐에 따라 CSS 클래스 조정
+                    sectionHtml += `<span class="section-header-badge ${bgColorClass}">${section.title}</span>
+                                    <p class="text-lg space-y-4 text-slate-700 leading-relaxed mb-6 mt-4">
+                                        ${section.description}
+                                    </p>
+                                    <div class="grid md:grid-cols-2 gap-4">
+                                        ${components[section.type] ? components[section.type].map(comp => {
+                                            // 'task' 또는 'context' 섹션의 경우에만 키워드 하이라이트 적용 (빨간색)
+                                            const labelHtml = (section.type === 'task' || (section.type === 'context' && comp.id === 'c2'))
+                                                ? highlightKeyword(comp.label, comp.keyword)
+                                                : comp.label;
+                                            
+                                            return `
+                                                <div id="${comp.id}" data-type="${section.type}" onclick="toggleComponent('${section.type}', '${comp.id}')"
+                                                    class="component-card p-4 bg-white rounded-lg shadow-sm">
+                                                    <p class="font-semibold text-slate-800">${labelHtml}</p>
+                                                    <p class="text-sm text-slate-500 mt-1 code-block">${comp.example.substring(0, 50)}...</p>
+                                                </div>
+                                            `;
+                                        }).join('') : ''}
+                                    </div>
+                                </div></section>`;
+                }
+                mainContentContainer.innerHTML += sectionHtml;
+            });
+            
+            updatePromptDisplay();
+        };
+
+        function copyPrompt() {
+            const promptText = document.getElementById('result-prompt').innerText;
+            if (promptText.includes('프롬프트의 핵심 요소를 조합')) {
+                // 비어있을 때 복사 방지
+                return;
+            }
+            // navigator.clipboard.writeText는 iframe에서 제한될 수 있으므로 document.execCommand 사용
+            const tempInput = document.createElement('textarea');
+            tempInput.value = promptText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            const copyButton = document.getElementById('copy-button');
+            copyButton.textContent = '복사 완료!';
+            setTimeout(() => {
+                copyButton.textContent = '프롬프트 복사하기';
+            }, 1500);
+        }
+
+        // --- Sidebar and Scrollspy Logic ---
+        document.addEventListener('DOMContentLoaded', function () {
+            const menuBtn = document.getElementById('menu-btn');
+            const sidebar = document.getElementById('sidebar');
+            const navLinks = document.querySelectorAll('.nav-link');
+            const allSections = document.querySelectorAll('.section-content');
+
+            // Toggle sidebar for mobile
+            menuBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('-translate-x-full');
+            });
+            
+            // Close sidebar when a link is clicked on mobile
+            navLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth < 768) { // md breakpoint is 768px
+                        sidebar.classList.add('-translate-x-full');
+                    }
+                });
+            });
+
+            // Scrollspy logic
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        navLinks.forEach(link => {
+                            link.classList.remove('active');
+                            if (link.getAttribute('href').substring(1) === entry.target.id) {
+                                link.classList.add('active');
+                            }
+                        });
+                    }
+                });
+            }, { rootMargin: "-40% 0px -40% 0px" }); // Adjusted rootMargin to make active state more responsive
+
+            allSections.forEach(section => observer.observe(section));
+        });
+    </script>
+</head>
+<body class="bg-slate-100">
+
+    <!-- Sidebar Navigation --><nav id="sidebar" class="fixed top-0 left-0 h-full w-72 bg-slate-800 text-slate-300 p-6 shadow-lg transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-20 overflow-y-auto">
+        <h2 class="text-2xl font-bold text-white mb-8 border-b border-slate-600 pb-4">AI 프롬프트 마스터</h2>
+        <ul class="space-y-2">
+            <li><a href="#intro" class="nav-link block py-2.5 px-4 rounded-md hover:bg-slate-700 hover:text-white transition-colors">🚀 소개</a></li>
+            <li><a href="#section-role" class="nav-link block py-2.5 px-4 rounded-md hover:bg-slate-700 hover:text-white transition-colors">1. 역할 (Persona) ⭐</a></li>
+            <li><a href="#section-task" class="nav-link block py-2.5 px-4 rounded-md hover:bg-slate-700 hover:text-white transition-colors">2. 작업 (Task) ⭐</a></li>
+            <li><a href="#section-context" class="nav-link block py-2.5 px-4 rounded-md hover:bg-slate-700 hover:text-white transition-colors">3. 맥락 (Context) ⭐</a></li>
+            <li><a href="#section-exemplar" class="nav-link block py-2.5 px-4 rounded-md hover:bg-slate-700 hover:text-white transition-colors">4. 예시 (Exemplars)</a></li>
+            <li><a href="#section-format" class="nav-link block py-2.5 px-4 rounded-md hover:bg-slate-700 hover:text-white transition-colors">5. 형식 (Format)</a></li>
+            <li><a href="#section-tone" class="nav-link block py-2.5 px-4 rounded-md hover:bg-slate-700 hover:text-white transition-colors">6. 어조 (Tone)</a></li>
+            <li><a href="#section-comparison" class="nav-link block py-2.5 px-4 rounded-md hover:bg-slate-700 hover:text-white transition-colors">🔥 프롬프트의 힘, 비교 체험</a></li>
+        </ul>
+    </nav>
+
+    <!-- Mobile Header --><header class="fixed top-0 left-0 right-0 bg-slate-800 p-4 shadow-md md:hidden z-10">
+        <div class="flex justify-between items-center">
+            <h1 class="text-white text-lg font-bold">AI 프롬프트 마스터</h1>
+            <button id="menu-btn" class="text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content --><main id="main-content" class="md:ml-72 p-4 md:p-10 transition-all duration-300 ease-in-out">
+        <div class="max-w-4xl mx-auto space-y-8">
+            
+            <!-- Sections will be injected here by JS --></div>
+    </main>
+    
+    <!-- Right Sidebar for Final Prompt (Adjusted for non-fixed position) --><aside class="fixed top-0 right-0 h-full w-72 p-6 overflow-y-auto z-10 hidden lg:block">
+        <div class="bg-yellow-50 rounded-2xl shadow-lg border border-yellow-200 p-6">
+            <h2 class="text-xl font-bold text-yellow-800 mb-3 flex justify-between items-center">
+                📢 최종 프롬프트 (요소 <span id="prompt-length" class="text-2xl font-extrabold">0</span>/6)
+            </h2>
+            <div class="bg-white p-4 rounded-lg border border-yellow-300 min-h-[150px] code-block max-h-[calc(100vh-250px)] overflow-y-auto">
+                <pre id="result-prompt" class="text-sm text-slate-700"></pre>
+            </div>
+            <button id="copy-button" onclick="copyPrompt()" class="mt-4 w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-md">
+                프롬프트 복사하기
+            </button>
+        </div>
+    </aside>
+
+    <!-- Watermark --><div class="fixed bottom-4 right-4 text-sm text-slate-400 pointer-events-none z-30 hidden md:block">
+        경기솔터초 강보람
+    </div>
+
+</body>
+</html>
